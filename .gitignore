@@ -16,3 +16,5 @@ yarn-error.log*
 .env.production.local
 .env.example
 .env.test
+/generated/prisma
+prisma/migrations/

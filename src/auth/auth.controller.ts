@@ -25,6 +25,8 @@ import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { TokenPayload } from './interfaces/user.interface';
 import { Request } from 'express';
 import { ChangePasswordDto } from './dto/change-password.dto';
+import { Roles } from '../rbac/decorators/roles.decorator';
+import { RolesGuard } from '../rbac/guards/roles.guard';
 
 @ApiTags('Authentication')
 // @Controller('auth')
@@ -159,16 +161,14 @@ export class AuthController {
   }
 
   @Get('all')
-  @UseGuards(JwtAuthGuard)
+  @Roles('admin')
+  @UseGuards(JwtAuthGuard, RolesGuard)
   @ApiBearerAuth('JWT-auth')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'List all users (admin only)' })
   @ApiResponse({ status: 200, description: 'List of users returned' })
   @ApiResponse({ status: 403, description: 'Forbidden' })
   async listAll(@Req() req: Request & { user: TokenPayload }) {
-    if (req.user.role !== 'admin') {
-      throw new ForbiddenException({ code: 'AUTH_005', message: 'Forbidden' });
-    }
     const users = await this.usersService.findAll();
     const sanitized = users.map(({ password, ...u }) => u);
     return {

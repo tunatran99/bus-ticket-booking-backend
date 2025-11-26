@@ -186,7 +186,21 @@ export class AuthService {
     };
   }
 
-  private async generateTokens(user: User) {
+  async loginWithGoogle(user: User) {
+    const tokens = await this.generateTokens(user);
+
+    const { password, ...userWithoutPassword } = user as any;
+
+    return {
+      success: true,
+      data: {
+        ...tokens,
+        user: userWithoutPassword,
+      },
+    };
+  }
+
+  async generateTokens(user: User) {
     const payload: TokenPayload = {
       userId: user.userId,
       email: user.email,
