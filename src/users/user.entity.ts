@@ -29,7 +29,7 @@ export class UserEntity {
   @Column({ type: 'varchar', length: 50, default: 'active' })
   status!: string;
 
-  @Column({ type: 'datetime', nullable: true })
+  @Column({ type: 'timestamp', nullable: true })
   last_login_at: Date | null = null;
 
   @CreateDateColumn()

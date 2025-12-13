@@ -6,6 +6,8 @@ import { UsersModule } from './users/users.module';
 import { DashboardModule } from './dashboard/dashboard.module';
 import { DatabaseInitModule } from './database/database-init.module';
 import { RbacModule } from './rbac/rbac.module';
+import { AdminModule } from './admin/admin.module';
+import { TripsModule } from './trips/trips.module';
 import { RequestIdMiddleware } from './common/middleware/request-id.middleware';
 
 @Module({
@@ -18,7 +20,7 @@ import { RequestIdMiddleware } from './common/middleware/request-id.middleware';
       imports: [ConfigModule],
       inject: [ConfigService],
       useFactory: (config: ConfigService) => ({
-        type: 'mysql',
+        type: 'postgres',
         host: config.get<string>('DB_HOST'),
         port: config.get<number>('DB_PORT'),
         username: config.get<string>('DB_USERNAME'),
@@ -30,9 +32,11 @@ import { RequestIdMiddleware } from './common/middleware/request-id.middleware';
     }),
     AuthModule,
     UsersModule,
-  DashboardModule,
-  DatabaseInitModule,
-  RbacModule,
+    DashboardModule,
+    DatabaseInitModule,
+    RbacModule,
+    TripsModule,
+    AdminModule,
   ],
   controllers: [],
   providers: [],
