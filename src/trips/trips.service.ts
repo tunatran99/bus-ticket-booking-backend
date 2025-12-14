@@ -287,6 +287,7 @@ export class TripsService {
     minPrice?: number;
     maxPrice?: number;
     busType?: string;
+    amenities?: string[];
     sortBy?: string;
     page?: number;
     limit?: number;
@@ -394,6 +395,17 @@ export class TripsService {
     if (filters.busType) {
       queryBuilder.andWhere("seatLayouts.seatType = :busType", {
         busType: filters.busType,
+      });
+    }
+
+    if (filters.amenities && filters.amenities.length > 0) {
+      filters.amenities.forEach((amenity, index) => {
+        queryBuilder.andWhere(
+          `LOWER(COALESCE(bus.amenities, '')) LIKE :amenity${index}`,
+          {
+            [`amenity${index}`]: `%${amenity.toLowerCase()}%`,
+          },
+        );
       });
     }
 

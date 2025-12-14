@@ -12,6 +12,16 @@ import { UpdateBusDto } from "./dto/update-bus.dto";
 
 @Injectable()
 export class BusesService {
+  private normalizeAmenities(amenities?: string[]): string[] | undefined {
+    if (!amenities) {
+      return undefined;
+    }
+    const normalized = amenities
+      .map((amenity) => amenity?.toLowerCase().trim())
+      .filter((value): value is string => Boolean(value));
+    return Array.from(new Set(normalized));
+  }
+
   constructor(
     @InjectRepository(BusEntity)
     private readonly busesRepository: Repository<BusEntity>,
@@ -38,6 +48,7 @@ export class BusesService {
       totalSeats: createBusDto.totalSeats,
       status: createBusDto.status ?? "active",
       notes: createBusDto.notes,
+      amenities: this.normalizeAmenities(createBusDto.amenities) ?? [],
     });
 
     const savedBus = await this.busesRepository.save(bus);
@@ -137,6 +148,10 @@ export class BusesService {
       totalSeats: updateBusDto.totalSeats ?? bus.totalSeats,
       status: updateBusDto.status ?? bus.status,
       notes: updateBusDto.notes ?? bus.notes,
+      amenities:
+        updateBusDto.amenities !== undefined
+          ? this.normalizeAmenities(updateBusDto.amenities)
+          : bus.amenities,
     });
 
     await this.busesRepository.save(bus);

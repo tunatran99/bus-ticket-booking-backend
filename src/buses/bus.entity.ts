@@ -34,6 +34,9 @@ export class BusEntity {
   @Column({ type: "text", nullable: true })
   notes?: string;
 
+  @Column({ type: "simple-json", nullable: true })
+  amenities?: string[];
+
   @CreateDateColumn()
   createdAt!: Date;
 

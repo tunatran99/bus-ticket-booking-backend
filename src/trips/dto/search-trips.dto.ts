@@ -7,8 +7,9 @@ import {
   Min,
   IsEnum,
   IsInt,
+  IsArray,
 } from "class-validator";
-import { Type } from "class-transformer";
+import { Transform, Type } from "class-transformer";
 
 export enum SortBy {
   PRICE_ASC = "price_asc",
@@ -95,6 +96,31 @@ export class SearchTripsDto {
   @IsOptional()
   @IsString()
   busType?: string;
+
+  @ApiProperty({
+    description: "Amenities to filter trips by",
+    example: ["wifi", "snacks"],
+    required: false,
+    type: [String],
+  })
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  @Transform(({ value }) => {
+    if (value === undefined || value === null || value === "") {
+      return undefined;
+    }
+    if (Array.isArray(value)) {
+      return value
+        .map((item) => (typeof item === "string" ? item.trim() : String(item)))
+        .filter(Boolean);
+    }
+    return String(value)
+      .split(",")
+      .map((item) => item.trim())
+      .filter(Boolean);
+  })
+  amenities?: string[];
 
   @ApiProperty({
     description: "Sort by",

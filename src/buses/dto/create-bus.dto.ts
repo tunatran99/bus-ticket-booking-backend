@@ -90,6 +90,17 @@ export class CreateBusDto {
   notes?: string;
 
   @ApiProperty({
+    description: "List of amenities available on the bus",
+    required: false,
+    type: [String],
+    example: ["wifi", "snacks"],
+  })
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  amenities?: string[];
+
+  @ApiProperty({
     description: "Seat layouts",
     type: [CreateSeatLayoutDto],
     required: false,
