@@ -1,10 +1,14 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import { BusEntity } from './bus.entity';
-import { SeatLayoutEntity, SeatType } from './seat-layout.entity';
-import { CreateBusDto, CreateSeatLayoutDto } from './dto/create-bus.dto';
-import { UpdateBusDto } from './dto/update-bus.dto';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+} from "@nestjs/common";
+import { InjectRepository } from "@nestjs/typeorm";
+import { Repository } from "typeorm";
+import { BusEntity } from "./bus.entity";
+import { SeatLayoutEntity, SeatType } from "./seat-layout.entity";
+import { CreateBusDto, CreateSeatLayoutDto } from "./dto/create-bus.dto";
+import { UpdateBusDto } from "./dto/update-bus.dto";
 
 @Injectable()
 export class BusesService {
@@ -22,7 +26,9 @@ export class BusesService {
     });
 
     if (existing) {
-      throw new BadRequestException(`Bus with license plate ${createBusDto.licensePlate} already exists`);
+      throw new BadRequestException(
+        `Bus with license plate ${createBusDto.licensePlate} already exists`,
+      );
     }
 
     const bus = this.busesRepository.create({
@@ -30,7 +36,7 @@ export class BusesService {
       brand: createBusDto.brand,
       model: createBusDto.model,
       totalSeats: createBusDto.totalSeats,
-      status: createBusDto.status ?? 'active',
+      status: createBusDto.status ?? "active",
       notes: createBusDto.notes,
     });
 
@@ -61,15 +67,15 @@ export class BusesService {
 
   async findAll(): Promise<BusEntity[]> {
     return this.busesRepository.find({
-      relations: ['seatLayouts'],
-      order: { createdAt: 'DESC' },
+      relations: ["seatLayouts"],
+      order: { createdAt: "DESC" },
     });
   }
 
   async findOne(id: number): Promise<BusEntity> {
     const bus = await this.busesRepository.findOne({
       where: { id },
-      relations: ['seatLayouts'],
+      relations: ["seatLayouts"],
     });
 
     if (!bus) {
@@ -82,13 +88,18 @@ export class BusesService {
   async update(id: number, updateBusDto: UpdateBusDto): Promise<BusEntity> {
     const bus = await this.findOne(id);
 
-    if (updateBusDto.licensePlate && updateBusDto.licensePlate !== bus.licensePlate) {
+    if (
+      updateBusDto.licensePlate &&
+      updateBusDto.licensePlate !== bus.licensePlate
+    ) {
       const existing = await this.busesRepository.findOne({
         where: { licensePlate: updateBusDto.licensePlate },
       });
 
       if (existing) {
-        throw new BadRequestException(`Bus with license plate ${updateBusDto.licensePlate} already exists`);
+        throw new BadRequestException(
+          `Bus with license plate ${updateBusDto.licensePlate} already exists`,
+        );
       }
     }
 
@@ -109,7 +120,10 @@ export class BusesService {
       await this.seatLayoutsRepository.save(seatLayouts);
 
       // Update total seats if provided
-      if (updateBusDto.totalSeats && updateBusDto.totalSeats !== seatLayouts.length) {
+      if (
+        updateBusDto.totalSeats &&
+        updateBusDto.totalSeats !== seatLayouts.length
+      ) {
         throw new BadRequestException(
           `Number of seat layouts (${seatLayouts.length}) must match total seats (${updateBusDto.totalSeats})`,
         );
@@ -135,7 +149,10 @@ export class BusesService {
     await this.busesRepository.remove(bus);
   }
 
-  async updateSeatLayout(busId: number, seatLayouts: CreateSeatLayoutDto[]): Promise<BusEntity> {
+  async updateSeatLayout(
+    busId: number,
+    seatLayouts: CreateSeatLayoutDto[],
+  ): Promise<BusEntity> {
     const bus = await this.findOne(busId);
 
     // Delete existing seat layouts
@@ -162,4 +179,3 @@ export class BusesService {
     return this.findOne(busId);
   }
 }
-

@@ -1,6 +1,6 @@
-import { randomBytes } from 'crypto';
+import { randomBytes } from "crypto";
 
-const DEFAULT_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
+const DEFAULT_ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
 
 export interface BookingReferenceOptions {
   /**
@@ -19,10 +19,10 @@ export interface BookingReferenceOptions {
 
 const sanitizePrefix = (raw?: string) => {
   if (!raw) {
-    return 'BT';
+    return "BT";
   }
-  const cleaned = raw.replace(/[^A-Za-z0-9]/g, '').slice(0, 4);
-  return cleaned.length ? cleaned.toUpperCase() : 'BT';
+  const cleaned = raw.replace(/[^A-Za-z0-9]/g, "").slice(0, 4);
+  return cleaned.length ? cleaned.toUpperCase() : "BT";
 };
 
 const formatDatePart = (date: Date) => {
@@ -33,27 +33,29 @@ const formatDatePart = (date: Date) => {
 
 const randomFromAlphabet = (length: number, alphabet = DEFAULT_ALPHABET) => {
   if (length <= 0) {
-    throw new Error('randomLength must be greater than zero');
+    throw new Error("randomLength must be greater than zero");
   }
   const buffer = randomBytes(length);
   return Array.from({ length })
     .map((_, index) => alphabet[buffer[index] % alphabet.length])
-    .join('');
+    .join("");
 };
 
 const checksumFor = (value: string, alphabet = DEFAULT_ALPHABET) => {
-  const total = value.split('').reduce((acc, char, idx) => {
-    const charValue = alphabet.indexOf(char) >= 0 ? alphabet.indexOf(char) : char.charCodeAt(0);
+  const total = value.split("").reduce((acc, char, idx) => {
+    const charValue =
+      alphabet.indexOf(char) >= 0 ? alphabet.indexOf(char) : char.charCodeAt(0);
     return acc + charValue * (idx + 1);
   }, 0);
 
   const first = alphabet[total % alphabet.length];
-  const second = alphabet[Math.floor(total / alphabet.length) % alphabet.length];
+  const second =
+    alphabet[Math.floor(total / alphabet.length) % alphabet.length];
   return `${first}${second}`;
 };
 
 export const generateBookingReference = (
-  options: BookingReferenceOptions = {}
+  options: BookingReferenceOptions = {},
 ): string => {
   const prefix = sanitizePrefix(options.prefix);
   const timestamp = options.timestamp ?? new Date();

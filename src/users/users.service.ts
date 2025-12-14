@@ -1,10 +1,10 @@
-import { Injectable, OnModuleInit } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import { UserEntity } from './user.entity';
-import { User as DomainUser } from '../auth/interfaces/user.interface';
-import * as bcrypt from 'bcrypt';
-import { randomUUID } from 'crypto';
+import { Injectable, OnModuleInit } from "@nestjs/common";
+import { InjectRepository } from "@nestjs/typeorm";
+import { Repository } from "typeorm";
+import { UserEntity } from "./user.entity";
+import { User as DomainUser } from "../auth/interfaces/user.interface";
+import * as bcrypt from "bcrypt";
+import { randomUUID } from "crypto";
 
 @Injectable()
 export class UsersService {
@@ -35,8 +35,8 @@ export class UsersService {
       phone: userData.phone ?? null,
       password: userData.password!,
       full_name: userData.fullName!,
-      role: userData.role ?? 'passenger',
-      status: 'active',
+      role: userData.role ?? "passenger",
+      status: "active",
     });
     const created = await this.repo.save(entity);
     return this.mapToDomain(created)!;
@@ -47,7 +47,9 @@ export class UsersService {
     return this.mapToDomain(user);
   }
 
-  async findByPhone(phone: string | undefined): Promise<DomainUser | undefined> {
+  async findByPhone(
+    phone: string | undefined,
+  ): Promise<DomainUser | undefined> {
     if (!phone) return undefined;
     const user = await this.repo.findOne({ where: { phone } });
     return this.mapToDomain(user);
@@ -65,7 +67,10 @@ export class UsersService {
     return this.mapToDomain(user);
   }
 
-  async updatePassword(userId: string, hashedPassword: string): Promise<DomainUser | undefined> {
+  async updatePassword(
+    userId: string,
+    hashedPassword: string,
+  ): Promise<DomainUser | undefined> {
     await this.repo.update({ user_id: userId }, { password: hashedPassword });
     const user = await this.repo.findOne({ where: { user_id: userId } });
     return this.mapToDomain(user);

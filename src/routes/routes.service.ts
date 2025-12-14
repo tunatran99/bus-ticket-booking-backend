@@ -1,10 +1,14 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import { RouteEntity } from './route.entity';
-import { RouteStopEntity } from './route-stop.entity';
-import { CreateRouteDto } from './dto/create-route.dto';
-import { UpdateRouteDto } from './dto/update-route.dto';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+} from "@nestjs/common";
+import { InjectRepository } from "@nestjs/typeorm";
+import { Repository } from "typeorm";
+import { RouteEntity } from "./route.entity";
+import { RouteStopEntity } from "./route-stop.entity";
+import { CreateRouteDto } from "./dto/create-route.dto";
+import { UpdateRouteDto } from "./dto/update-route.dto";
 
 @Injectable()
 export class RoutesService {
@@ -17,14 +21,18 @@ export class RoutesService {
 
   async create(createRouteDto: CreateRouteDto): Promise<RouteEntity> {
     if (!createRouteDto.stops || createRouteDto.stops.length < 2) {
-      throw new BadRequestException('Route must have at least 2 stops');
+      throw new BadRequestException("Route must have at least 2 stops");
     }
 
     // Validate stop order
-    const orders = createRouteDto.stops.map((s) => s.order).sort((a, b) => a - b);
+    const orders = createRouteDto.stops
+      .map((s) => s.order)
+      .sort((a, b) => a - b);
     for (let i = 0; i < orders.length; i++) {
       if (orders[i] !== i) {
-        throw new BadRequestException(`Stop orders must be consecutive starting from 0. Found: ${orders.join(', ')}`);
+        throw new BadRequestException(
+          `Stop orders must be consecutive starting from 0. Found: ${orders.join(", ")}`,
+        );
       }
     }
 
@@ -53,15 +61,15 @@ export class RoutesService {
 
   async findAll(): Promise<RouteEntity[]> {
     return this.routesRepository.find({
-      relations: ['stops'],
-      order: { createdAt: 'DESC' },
+      relations: ["stops"],
+      order: { createdAt: "DESC" },
     });
   }
 
   async findOne(id: number): Promise<RouteEntity> {
     const route = await this.routesRepository.findOne({
       where: { id },
-      relations: ['stops'],
+      relations: ["stops"],
     });
 
     if (!route) {
@@ -71,12 +79,15 @@ export class RoutesService {
     return route;
   }
 
-  async update(id: number, updateRouteDto: UpdateRouteDto): Promise<RouteEntity> {
+  async update(
+    id: number,
+    updateRouteDto: UpdateRouteDto,
+  ): Promise<RouteEntity> {
     const route = await this.findOne(id);
 
     if (updateRouteDto.stops) {
       if (updateRouteDto.stops.length < 2) {
-        throw new BadRequestException('Route must have at least 2 stops');
+        throw new BadRequestException("Route must have at least 2 stops");
       }
 
       // Delete existing stops
@@ -97,7 +108,8 @@ export class RoutesService {
       name: updateRouteDto.name ?? route.name,
       description: updateRouteDto.description ?? route.description,
       distance: updateRouteDto.distance ?? route.distance,
-      estimatedDuration: updateRouteDto.estimatedDuration ?? route.estimatedDuration,
+      estimatedDuration:
+        updateRouteDto.estimatedDuration ?? route.estimatedDuration,
       isActive: updateRouteDto.isActive ?? route.isActive,
     });
 
@@ -111,5 +123,3 @@ export class RoutesService {
     await this.routesRepository.remove(route);
   }
 }
-
-

@@ -3,14 +3,14 @@ import {
   ConflictException,
   UnauthorizedException,
   NotFoundException,
-} from '@nestjs/common';
-import { JwtService } from '@nestjs/jwt';
-import { ConfigService } from '@nestjs/config';
-import * as bcrypt from 'bcrypt';
-import { UsersService } from '../users/users.service';
-import { RegisterDto } from './dto/register.dto';
-import { LoginDto } from './dto/login.dto';
-import { User, TokenPayload } from './interfaces/user.interface';
+} from "@nestjs/common";
+import { JwtService } from "@nestjs/jwt";
+import { ConfigService } from "@nestjs/config";
+import * as bcrypt from "bcrypt";
+import { UsersService } from "../users/users.service";
+import { RegisterDto } from "./dto/register.dto";
+import { LoginDto } from "./dto/login.dto";
+import { User, TokenPayload } from "./interfaces/user.interface";
 
 @Injectable()
 export class AuthService {
@@ -27,19 +27,20 @@ export class AuthService {
     );
     if (existingEmail) {
       throw new ConflictException({
-        code: 'USER_002',
-        message: 'Email already exists',
+        code: "USER_002",
+        message: "Email already exists",
       });
     }
 
     // Check if phone already exists
     const normalizedPhone = registerDto.phone?.trim();
     if (normalizedPhone) {
-      const existingPhone = await this.usersService.findByPhone(normalizedPhone);
+      const existingPhone =
+        await this.usersService.findByPhone(normalizedPhone);
       if (existingPhone) {
         throw new ConflictException({
-          code: 'USER_003',
-          message: 'Phone already exists',
+          code: "USER_003",
+          message: "Phone already exists",
         });
       }
     }
@@ -59,7 +60,7 @@ export class AuthService {
     return {
       success: true,
       data: userWithoutPassword,
-      message: 'registration successful',
+      message: "registration successful",
     };
   }
 
@@ -69,8 +70,8 @@ export class AuthService {
 
     if (!user) {
       throw new UnauthorizedException({
-        code: 'AUTH_001',
-        message: 'Invalid credentials',
+        code: "AUTH_001",
+        message: "Invalid credentials",
       });
     }
 
@@ -82,8 +83,8 @@ export class AuthService {
 
     if (!isPasswordValid) {
       throw new UnauthorizedException({
-        code: 'AUTH_001',
-        message: 'Invalid credentials',
+        code: "AUTH_001",
+        message: "Invalid credentials",
       });
     }
 
@@ -105,14 +106,14 @@ export class AuthService {
   async refreshToken(refreshToken: string) {
     try {
       const payload = await this.jwtService.verifyAsync(refreshToken, {
-        secret: this.configService.get('JWT_REFRESH_SECRET'),
+        secret: this.configService.get("JWT_REFRESH_SECRET"),
       });
 
       const user = await this.usersService.findById(payload.userId);
       if (!user) {
         throw new UnauthorizedException({
-          code: 'AUTH_002',
-          message: 'Invalid refresh token',
+          code: "AUTH_002",
+          message: "Invalid refresh token",
         });
       }
 
@@ -122,13 +123,13 @@ export class AuthService {
         success: true,
         data: {
           accessToken,
-          expiresIn: parseInt(this.configService.get('JWT_EXPIRES_IN')),
+          expiresIn: parseInt(this.configService.get("JWT_EXPIRES_IN")),
         },
       };
     } catch (error) {
       throw new UnauthorizedException({
-        code: 'AUTH_002',
-        message: 'Token expired or invalid',
+        code: "AUTH_002",
+        message: "Token expired or invalid",
       });
     }
   }
@@ -138,30 +139,37 @@ export class AuthService {
     // For example, by adding it to a blacklist in Redis
     return {
       success: true,
-      message: 'logged out successfully',
+      message: "logged out successfully",
     };
   }
 
-  async changePassword(userId: string, currentPassword: string, newPassword: string) {
+  async changePassword(
+    userId: string,
+    currentPassword: string,
+    newPassword: string,
+  ) {
     const user = await this.usersService.findById(userId);
     if (!user) {
       throw new UnauthorizedException({
-        code: 'AUTH_003',
-        message: 'User not found',
+        code: "AUTH_003",
+        message: "User not found",
       });
     }
-    const isPasswordValid = await bcrypt.compare(currentPassword, user.password);
+    const isPasswordValid = await bcrypt.compare(
+      currentPassword,
+      user.password,
+    );
     if (!isPasswordValid) {
       throw new UnauthorizedException({
-        code: 'AUTH_004',
-        message: 'Current password is incorrect',
+        code: "AUTH_004",
+        message: "Current password is incorrect",
       });
     }
     const hashed = await bcrypt.hash(newPassword, 10);
     await this.usersService.updatePassword(user.userId, hashed);
     return {
       success: true,
-      message: 'Password updated successfully',
+      message: "Password updated successfully",
     };
   }
 
@@ -170,8 +178,8 @@ export class AuthService {
 
     if (!user) {
       throw new NotFoundException({
-        code: 'USER_001',
-        message: 'User not found',
+        code: "USER_001",
+        message: "User not found",
       });
     }
 
@@ -182,7 +190,7 @@ export class AuthService {
 
     return {
       success: true,
-      message: 'Password reset email sent',
+      message: "Password reset email sent",
     };
   }
 
@@ -209,19 +217,19 @@ export class AuthService {
 
     const [accessToken, refreshToken] = await Promise.all([
       this.jwtService.signAsync(payload, {
-        secret: this.configService.get('JWT_SECRET'),
-        expiresIn: this.configService.get('JWT_EXPIRES_IN'),
+        secret: this.configService.get("JWT_SECRET"),
+        expiresIn: this.configService.get("JWT_EXPIRES_IN"),
       }),
       this.jwtService.signAsync(payload, {
-        secret: this.configService.get('JWT_REFRESH_SECRET'),
-        expiresIn: this.configService.get('JWT_REFRESH_EXPIRES_IN'),
+        secret: this.configService.get("JWT_REFRESH_SECRET"),
+        expiresIn: this.configService.get("JWT_REFRESH_EXPIRES_IN"),
       }),
     ]);
 
     return {
       accessToken,
       refreshToken,
-      expiresIn: parseInt(this.configService.get('JWT_EXPIRES_IN')),
+      expiresIn: parseInt(this.configService.get("JWT_EXPIRES_IN")),
     };
   }
 
@@ -233,8 +241,8 @@ export class AuthService {
     };
 
     return this.jwtService.signAsync(payload, {
-      secret: this.configService.get('JWT_SECRET'),
-      expiresIn: this.configService.get('JWT_EXPIRES_IN'),
+      secret: this.configService.get("JWT_SECRET"),
+      expiresIn: this.configService.get("JWT_EXPIRES_IN"),
     });
   }
 }

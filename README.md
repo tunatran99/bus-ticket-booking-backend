@@ -2,6 +2,9 @@
 
 A NestJS-based REST API for the Bus Ticket Booking System with JWT authentication, Swagger documentation, and comprehensive validation.
 
+# Github
+https://github.com/tunatran99/bus-ticket-booking-backend.git
+
 ## Features
 
 - 🔐 JWT-based authentication with refresh tokens
@@ -13,9 +16,11 @@ A NestJS-based REST API for the Bus Ticket Booking System with JWT authenticatio
 - 📱 Vietnamese phone number validation
 - 🚦 Rate limiting support
 - 📋 Standardized API responses
+- 📧 E-ticket emails with SMTP fallback logging
+- 🧾 In-memory bookings API for creation, listing, and cancellation
+- 💾 Persistent JSON-backed booking store with automatic expiration
 
 ## Tech Stack
-
 - **Framework**: NestJS 10
 - **Authentication**: JWT (JSON Web Tokens)
 - **Validation**: class-validator, class-transformer
@@ -49,6 +54,8 @@ Edit `.env` file and update the following variables:
 - `JWT_REFRESH_SECRET`: Your refresh token secret key
 - `PORT`: Server port (default: 3000)
 - `CORS_ORIGIN`: Frontend URL (default: http://localhost:5173)
+- `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM`: SMTP credentials for the ticket email service. When omitted, emails are logged to the console instead of being sent.
+- `BOOKING_EXPIRY_MINUTES`: TTL for pending bookings before they automatically expire (default: 30).
 
 ## Running the Application
 
@@ -136,6 +143,26 @@ The dashboard endpoints expose simple, in-memory demo metrics that the frontend 
 - Returns admin-level metrics (total users, total admins, recent users) when the current user has `role: 'admin'`.
 - For non-admin users, returns empty metrics.
 - Headers: `Authorization: Bearer <accessToken>`
+
+### Bookings
+
+- **POST** `/api/v1/bookings`
+  - Create a booking from the checkout flow (requires `Authorization: Bearer <accessToken>`).
+  - Calculates totals, stores passengers/contact, and returns the booking reference.
+- **GET** `/api/v1/bookings`
+  - List bookings associated with the authenticated user.
+- **GET** `/api/v1/bookings/:reference`
+  - Retrieve booking details by reference code.
+- **PATCH** `/api/v1/bookings/:reference/cancel`
+  - Mark an existing booking as cancelled.
+- **PATCH** `/api/v1/bookings/:reference/confirm`
+  - Confirm a pending booking before its TTL lapses; otherwise it transitions to `expired` automatically.
+
+### Ticket Emails
+
+- **POST** `/api/v1/tickets/email`
+- Send an e-ticket by passing the payload defined in `SendTicketDto` (booking reference, passenger details, schedule, seat, etc.).
+- When the SMTP variables are configured, real emails are sent via nodemailer; otherwise the payload is logged so you can keep developing without credentials.
 
 ## Authentication Model: Access + Refresh Tokens
 

@@ -1,11 +1,16 @@
-import { Injectable, NotFoundException, BadRequestException, ConflictException } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import { TripEntity, TripStatus } from './trip.entity';
-import { BusEntity } from '../buses/bus.entity';
-import { RouteEntity } from '../routes/route.entity';
-import { CreateTripDto } from './dto/create-trip.dto';
-import { UpdateTripDto } from './dto/update-trip.dto';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+  ConflictException,
+} from "@nestjs/common";
+import { InjectRepository } from "@nestjs/typeorm";
+import { Repository } from "typeorm";
+import { TripEntity, TripStatus } from "./trip.entity";
+import { BusEntity } from "../buses/bus.entity";
+import { RouteEntity } from "../routes/route.entity";
+import { CreateTripDto } from "./dto/create-trip.dto";
+import { UpdateTripDto } from "./dto/update-trip.dto";
 
 @Injectable()
 export class TripsService {
@@ -20,22 +25,28 @@ export class TripsService {
 
   async create(createTripDto: CreateTripDto): Promise<TripEntity> {
     // Verify bus exists
-    const bus = await this.busesRepository.findOne({ where: { id: createTripDto.busId } });
+    const bus = await this.busesRepository.findOne({
+      where: { id: createTripDto.busId },
+    });
     if (!bus) {
-      throw new NotFoundException(`Bus with ID ${createTripDto.busId} not found`);
+      throw new NotFoundException(
+        `Bus with ID ${createTripDto.busId} not found`,
+      );
     }
 
-    if (bus.status !== 'active') {
+    if (bus.status !== "active") {
       throw new BadRequestException(`Bus ${bus.licensePlate} is not active`);
     }
 
     // Verify route exists
     const route = await this.routesRepository.findOne({
       where: { id: createTripDto.routeId },
-      relations: ['stops'],
+      relations: ["stops"],
     });
     if (!route) {
-      throw new NotFoundException(`Route with ID ${createTripDto.routeId} not found`);
+      throw new NotFoundException(
+        `Route with ID ${createTripDto.routeId} not found`,
+      );
     }
 
     const departureTime = new Date(createTripDto.departureTime);
@@ -44,7 +55,11 @@ export class TripsService {
       : new Date(departureTime.getTime() + route.estimatedDuration * 60 * 1000);
 
     // Check for scheduling conflicts
-    await this.checkBusConflict(createTripDto.busId, departureTime, arrivalTime);
+    await this.checkBusConflict(
+      createTripDto.busId,
+      departureTime,
+      arrivalTime,
+    );
 
     const trip = this.tripsRepository.create({
       routeId: createTripDto.routeId,
@@ -60,40 +75,55 @@ export class TripsService {
     return this.tripsRepository.save(trip);
   }
 
-  async findAll(filters?: { routeId?: number; busId?: number; status?: TripStatus; dateFrom?: Date; dateTo?: Date }): Promise<TripEntity[]> {
-    const queryBuilder = this.tripsRepository.createQueryBuilder('trip')
-      .leftJoinAndSelect('trip.route', 'route')
-      .leftJoinAndSelect('route.stops', 'stops')
-      .leftJoinAndSelect('trip.bus', 'bus')
-      .leftJoinAndSelect('bus.seatLayouts', 'seatLayouts');
+  async findAll(filters?: {
+    routeId?: number;
+    busId?: number;
+    status?: TripStatus;
+    dateFrom?: Date;
+    dateTo?: Date;
+  }): Promise<TripEntity[]> {
+    const queryBuilder = this.tripsRepository
+      .createQueryBuilder("trip")
+      .leftJoinAndSelect("trip.route", "route")
+      .leftJoinAndSelect("route.stops", "stops")
+      .leftJoinAndSelect("trip.bus", "bus")
+      .leftJoinAndSelect("bus.seatLayouts", "seatLayouts");
 
     if (filters?.routeId) {
-      queryBuilder.andWhere('trip.routeId = :routeId', { routeId: filters.routeId });
+      queryBuilder.andWhere("trip.routeId = :routeId", {
+        routeId: filters.routeId,
+      });
     }
 
     if (filters?.busId) {
-      queryBuilder.andWhere('trip.busId = :busId', { busId: filters.busId });
+      queryBuilder.andWhere("trip.busId = :busId", { busId: filters.busId });
     }
 
     if (filters?.status) {
-      queryBuilder.andWhere('trip.status = :status', { status: filters.status });
+      queryBuilder.andWhere("trip.status = :status", {
+        status: filters.status,
+      });
     }
 
     if (filters?.dateFrom) {
-      queryBuilder.andWhere('trip.departureTime >= :dateFrom', { dateFrom: filters.dateFrom });
+      queryBuilder.andWhere("trip.departureTime >= :dateFrom", {
+        dateFrom: filters.dateFrom,
+      });
     }
 
     if (filters?.dateTo) {
-      queryBuilder.andWhere('trip.departureTime <= :dateTo', { dateTo: filters.dateTo });
+      queryBuilder.andWhere("trip.departureTime <= :dateTo", {
+        dateTo: filters.dateTo,
+      });
     }
 
-    return queryBuilder.orderBy('trip.departureTime', 'ASC').getMany();
+    return queryBuilder.orderBy("trip.departureTime", "ASC").getMany();
   }
 
   async findOne(id: number): Promise<TripEntity> {
     const trip = await this.tripsRepository.findOne({
       where: { id },
-      relations: ['route', 'route.stops', 'bus', 'bus.seatLayouts'],
+      relations: ["route", "route.stops", "bus", "bus.seatLayouts"],
     });
 
     if (!trip) {
@@ -107,30 +137,42 @@ export class TripsService {
     const trip = await this.findOne(id);
 
     if (updateTripDto.busId && updateTripDto.busId !== trip.busId) {
-      const bus = await this.busesRepository.findOne({ where: { id: updateTripDto.busId } });
+      const bus = await this.busesRepository.findOne({
+        where: { id: updateTripDto.busId },
+      });
       if (!bus) {
-        throw new NotFoundException(`Bus with ID ${updateTripDto.busId} not found`);
+        throw new NotFoundException(
+          `Bus with ID ${updateTripDto.busId} not found`,
+        );
       }
-      if (bus.status !== 'active') {
+      if (bus.status !== "active") {
         throw new BadRequestException(`Bus ${bus.licensePlate} is not active`);
       }
     }
 
     if (updateTripDto.routeId && updateTripDto.routeId !== trip.routeId) {
-      const route = await this.routesRepository.findOne({ where: { id: updateTripDto.routeId } });
+      const route = await this.routesRepository.findOne({
+        where: { id: updateTripDto.routeId },
+      });
       if (!route) {
-        throw new NotFoundException(`Route with ID ${updateTripDto.routeId} not found`);
+        throw new NotFoundException(
+          `Route with ID ${updateTripDto.routeId} not found`,
+        );
       }
     }
 
-    const departureTime = updateTripDto.departureTime ? new Date(updateTripDto.departureTime) : trip.departureTime;
+    const departureTime = updateTripDto.departureTime
+      ? new Date(updateTripDto.departureTime)
+      : trip.departureTime;
     const route = await this.routesRepository.findOne({
       where: { id: updateTripDto.routeId ?? trip.routeId },
     });
     const arrivalTime = updateTripDto.arrivalTime
       ? new Date(updateTripDto.arrivalTime)
       : route
-        ? new Date(departureTime.getTime() + route.estimatedDuration * 60 * 1000)
+        ? new Date(
+            departureTime.getTime() + route.estimatedDuration * 60 * 1000,
+          )
         : trip.arrivalTime;
 
     // Check for scheduling conflicts (excluding current trip)
@@ -184,14 +226,19 @@ export class TripsService {
 
       // Check for time overlap
       const hasConflict =
-        (departureTime >= existingTrip.departureTime && departureTime < (existingTrip.arrivalTime || new Date())) ||
-        (arrivalTime > existingTrip.departureTime && arrivalTime <= (existingTrip.arrivalTime || new Date())) ||
-        (departureTime <= existingTrip.departureTime && arrivalTime >= (existingTrip.arrivalTime || new Date()));
+        (departureTime >= existingTrip.departureTime &&
+          departureTime < (existingTrip.arrivalTime || new Date())) ||
+        (arrivalTime > existingTrip.departureTime &&
+          arrivalTime <= (existingTrip.arrivalTime || new Date())) ||
+        (departureTime <= existingTrip.departureTime &&
+          arrivalTime >= (existingTrip.arrivalTime || new Date()));
 
       if (hasConflict) {
-        const bus = await this.busesRepository.findOne({ where: { id: busId } });
+        const bus = await this.busesRepository.findOne({
+          where: { id: busId },
+        });
         throw new ConflictException(
-          `Bus ${bus?.licensePlate} is already scheduled for a trip from ${existingTrip.departureTime.toISOString()} to ${existingTrip.arrivalTime?.toISOString() || 'TBD'}`,
+          `Bus ${bus?.licensePlate} is already scheduled for a trip from ${existingTrip.departureTime.toISOString()} to ${existingTrip.arrivalTime?.toISOString() || "TBD"}`,
         );
       }
     }
@@ -200,19 +247,26 @@ export class TripsService {
   /**
    * Get available buses for a given time range
    */
-  async getAvailableBuses(departureTime: Date, arrivalTime: Date): Promise<BusEntity[]> {
+  async getAvailableBuses(
+    departureTime: Date,
+    arrivalTime: Date,
+  ): Promise<BusEntity[]> {
     const allBuses = await this.busesRepository.find({
-      where: { status: 'active' },
-      relations: ['trips'],
+      where: { status: "active" },
+      relations: ["trips"],
     });
 
     const availableBuses = allBuses.filter((bus) => {
       const conflictingTrips = bus.trips?.filter(
         (trip) =>
-          (trip.status === TripStatus.SCHEDULED || trip.status === TripStatus.IN_PROGRESS) &&
-          ((departureTime >= trip.departureTime && departureTime < (trip.arrivalTime || new Date())) ||
-            (arrivalTime > trip.departureTime && arrivalTime <= (trip.arrivalTime || new Date())) ||
-            (departureTime <= trip.departureTime && arrivalTime >= (trip.arrivalTime || new Date()))),
+          (trip.status === TripStatus.SCHEDULED ||
+            trip.status === TripStatus.IN_PROGRESS) &&
+          ((departureTime >= trip.departureTime &&
+            departureTime < (trip.arrivalTime || new Date())) ||
+            (arrivalTime > trip.departureTime &&
+              arrivalTime <= (trip.arrivalTime || new Date())) ||
+            (departureTime <= trip.departureTime &&
+              arrivalTime >= (trip.arrivalTime || new Date()))),
       );
 
       return !conflictingTrips || conflictingTrips.length === 0;
@@ -236,15 +290,21 @@ export class TripsService {
     sortBy?: string;
     page?: number;
     limit?: number;
-  }): Promise<{ trips: TripEntity[]; total: number; page: number; limit: number; totalPages: number }> {
+  }): Promise<{
+    trips: TripEntity[];
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+  }> {
     const queryBuilder = this.tripsRepository
-      .createQueryBuilder('trip')
-      .leftJoinAndSelect('trip.route', 'route')
-      .leftJoinAndSelect('route.stops', 'stops')
-      .leftJoinAndSelect('trip.bus', 'bus')
-      .leftJoinAndSelect('bus.seatLayouts', 'seatLayouts')
-      .where('trip.status = :status', { status: TripStatus.SCHEDULED })
-      .andWhere('route.isActive = :isActive', { isActive: true });
+      .createQueryBuilder("trip")
+      .leftJoinAndSelect("trip.route", "route")
+      .leftJoinAndSelect("route.stops", "stops")
+      .leftJoinAndSelect("trip.bus", "bus")
+      .leftJoinAndSelect("bus.seatLayouts", "seatLayouts")
+      .where("trip.status = :status", { status: TripStatus.SCHEDULED })
+      .andWhere("route.isActive = :isActive", { isActive: true });
 
     // Filter by origin (check if first stop matches or route name contains origin)
     if (filters.origin) {
@@ -283,71 +343,86 @@ export class TripsService {
       const date = new Date(filters.date);
       const nextDay = new Date(date);
       nextDay.setDate(nextDay.getDate() + 1);
-      queryBuilder.andWhere('trip.departureTime >= :dateFrom AND trip.departureTime < :dateTo', {
-        dateFrom: date,
-        dateTo: nextDay,
-      });
+      queryBuilder.andWhere(
+        "trip.departureTime >= :dateFrom AND trip.departureTime < :dateTo",
+        {
+          dateFrom: date,
+          dateTo: nextDay,
+        },
+      );
     } else {
       // Only show future trips
-      queryBuilder.andWhere('trip.departureTime >= :now', { now: new Date() });
+      queryBuilder.andWhere("trip.departureTime >= :now", { now: new Date() });
     }
 
     // Filter by time range
     if (filters.timeFrom) {
-      const [hours, minutes] = filters.timeFrom.split(':').map(Number);
+      const [hours, minutes] = filters.timeFrom.split(":").map(Number);
       const timeFrom = new Date();
       timeFrom.setHours(hours, minutes || 0, 0, 0);
-      queryBuilder.andWhere('EXTRACT(HOUR FROM trip.departureTime) * 60 + EXTRACT(MINUTE FROM trip.departureTime) >= :timeFromMinutes', {
-        timeFromMinutes: hours * 60 + (minutes || 0),
-      });
+      queryBuilder.andWhere(
+        "EXTRACT(HOUR FROM trip.departureTime) * 60 + EXTRACT(MINUTE FROM trip.departureTime) >= :timeFromMinutes",
+        {
+          timeFromMinutes: hours * 60 + (minutes || 0),
+        },
+      );
     }
 
     if (filters.timeTo) {
-      const [hours, minutes] = filters.timeTo.split(':').map(Number);
-      queryBuilder.andWhere('EXTRACT(HOUR FROM trip.departureTime) * 60 + EXTRACT(MINUTE FROM trip.departureTime) <= :timeToMinutes', {
-        timeToMinutes: hours * 60 + (minutes || 0),
-      });
+      const [hours, minutes] = filters.timeTo.split(":").map(Number);
+      queryBuilder.andWhere(
+        "EXTRACT(HOUR FROM trip.departureTime) * 60 + EXTRACT(MINUTE FROM trip.departureTime) <= :timeToMinutes",
+        {
+          timeToMinutes: hours * 60 + (minutes || 0),
+        },
+      );
     }
 
     // Filter by price range
     if (filters.minPrice !== undefined) {
-      queryBuilder.andWhere('trip.basePrice >= :minPrice', { minPrice: filters.minPrice });
+      queryBuilder.andWhere("trip.basePrice >= :minPrice", {
+        minPrice: filters.minPrice,
+      });
     }
     if (filters.maxPrice !== undefined) {
-      queryBuilder.andWhere('trip.basePrice <= :maxPrice', { maxPrice: filters.maxPrice });
+      queryBuilder.andWhere("trip.basePrice <= :maxPrice", {
+        maxPrice: filters.maxPrice,
+      });
     }
 
     // Filter by bus type (seat type)
     if (filters.busType) {
-      queryBuilder.andWhere('seatLayouts.seatType = :busType', { busType: filters.busType });
+      queryBuilder.andWhere("seatLayouts.seatType = :busType", {
+        busType: filters.busType,
+      });
     }
 
     // Get total count before pagination
     const total = await queryBuilder.getCount();
 
     // Sorting
-    const sortBy = filters.sortBy || 'time_asc';
+    const sortBy = filters.sortBy || "time_asc";
     switch (sortBy) {
-      case 'price_asc':
-        queryBuilder.orderBy('trip.basePrice', 'ASC');
+      case "price_asc":
+        queryBuilder.orderBy("trip.basePrice", "ASC");
         break;
-      case 'price_desc':
-        queryBuilder.orderBy('trip.basePrice', 'DESC');
+      case "price_desc":
+        queryBuilder.orderBy("trip.basePrice", "DESC");
         break;
-      case 'time_asc':
-        queryBuilder.orderBy('trip.departureTime', 'ASC');
+      case "time_asc":
+        queryBuilder.orderBy("trip.departureTime", "ASC");
         break;
-      case 'time_desc':
-        queryBuilder.orderBy('trip.departureTime', 'DESC');
+      case "time_desc":
+        queryBuilder.orderBy("trip.departureTime", "DESC");
         break;
-      case 'duration_asc':
-        queryBuilder.orderBy('route.estimatedDuration', 'ASC');
+      case "duration_asc":
+        queryBuilder.orderBy("route.estimatedDuration", "ASC");
         break;
-      case 'duration_desc':
-        queryBuilder.orderBy('route.estimatedDuration', 'DESC');
+      case "duration_desc":
+        queryBuilder.orderBy("route.estimatedDuration", "DESC");
         break;
       default:
-        queryBuilder.orderBy('trip.departureTime', 'ASC');
+        queryBuilder.orderBy("trip.departureTime", "ASC");
     }
 
     // Pagination
@@ -367,4 +442,3 @@ export class TripsService {
     };
   }
 }
-
