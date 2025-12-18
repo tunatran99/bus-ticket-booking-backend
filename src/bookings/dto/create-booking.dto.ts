@@ -12,7 +12,7 @@ import {
   ValidateNested,
 } from "class-validator";
 
-class BookingContactDto {
+export class BookingContactDto {
   @IsString()
   @IsNotEmpty()
   phone!: string;
@@ -22,7 +22,7 @@ class BookingContactDto {
   email?: string;
 }
 
-class BookingPassengerDto {
+export class BookingPassengerDto {
   @IsString()
   @IsNotEmpty()
   name!: string;

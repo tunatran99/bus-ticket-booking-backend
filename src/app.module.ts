@@ -1,6 +1,7 @@
 import { Module, NestModule, MiddlewareConsumer } from "@nestjs/common";
 import { ConfigModule, ConfigService } from "@nestjs/config";
 import { TypeOrmModule } from "@nestjs/typeorm";
+import { ScheduleModule } from "@nestjs/schedule";
 import { AuthModule } from "./auth/auth.module";
 import { UsersModule } from "./users/users.module";
 import { DashboardModule } from "./dashboard/dashboard.module";
@@ -11,6 +12,8 @@ import { TripsModule } from "./trips/trips.module";
 import { TicketsModule } from "./tickets/tickets.module";
 import { BookingsModule } from "./bookings/bookings.module";
 import { RequestIdMiddleware } from "./common/middleware/request-id.middleware";
+import { PaymentsModule } from "./payments/payments.module";
+import { NotificationsModule } from "./notifications/notifications.module";
 
 @Module({
   imports: [
@@ -18,6 +21,7 @@ import { RequestIdMiddleware } from "./common/middleware/request-id.middleware";
       isGlobal: true,
       envFilePath: [`.env.${process.env.NODE_ENV}`, ".env"],
     }),
+    ScheduleModule.forRoot(),
     TypeOrmModule.forRootAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
@@ -41,6 +45,8 @@ import { RequestIdMiddleware } from "./common/middleware/request-id.middleware";
     AdminModule,
     TicketsModule,
     BookingsModule,
+    PaymentsModule,
+    NotificationsModule,
   ],
   controllers: [],
   providers: [],

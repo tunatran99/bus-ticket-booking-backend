@@ -30,6 +30,7 @@ import { SeatLocksService } from "./seat-locks.service";
 import { SeatAvailabilityQueryDto } from "./dto/seat-availability-query.dto";
 import { GuestBookingLookupDto } from "./dto/guest-booking-lookup.dto";
 import { ContactVerificationDto } from "./dto/contact-verification.dto";
+import { UpdateBookingDto } from "./dto/update-booking.dto";
 
 interface AuthenticatedRequest extends Request {
   user?: TokenPayload;
@@ -62,6 +63,7 @@ export class BookingsController {
         total: booking.total,
         currency: booking.currency,
         status: booking.status,
+        paymentStatus: booking.paymentStatus,
         expiresAt: booking.expiresAt,
       },
     };
@@ -80,6 +82,7 @@ export class BookingsController {
         total: booking.total,
         currency: booking.currency,
         status: booking.status,
+        paymentStatus: booking.paymentStatus,
         expiresAt: booking.expiresAt,
       },
     };
@@ -194,6 +197,37 @@ export class BookingsController {
       });
     }
     const updated = await this.bookingsService.cancel(reference);
+    return {
+      success: true,
+      data: updated,
+    };
+  }
+
+  @Patch(":reference")
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth("JWT-auth")
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: "Update booking passenger or contact details" })
+  async updateBooking(
+    @Req() req: AuthenticatedRequest,
+    @Param("reference") reference: string,
+    @Body() dto: UpdateBookingDto,
+  ) {
+    const booking = await this.bookingsService.findByReference(reference);
+    if (!booking) {
+      throw new NotFoundException({
+        code: "BOOKING_001",
+        message: "Booking not found",
+      });
+    }
+    const userId = req.user?.userId;
+    if (booking.userId && userId && booking.userId !== userId) {
+      throw new ForbiddenException({
+        code: "BOOKING_002",
+        message: "You do not have access to this booking",
+      });
+    }
+    const updated = await this.bookingsService.updateBooking(reference, dto);
     return {
       success: true,
       data: updated,

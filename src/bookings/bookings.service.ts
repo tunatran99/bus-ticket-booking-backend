@@ -11,8 +11,13 @@ import { randomUUID } from "crypto";
 import { promises as fs } from "fs";
 import { dirname, join } from "path";
 import { CreateBookingDto } from "./dto/create-booking.dto";
-import { BookingRecord } from "./interfaces/booking.interface";
+import { UpdateBookingDto } from "./dto/update-booking.dto";
+import {
+  BookingPaymentStatus,
+  BookingRecord,
+} from "./interfaces/booking.interface";
 import { SeatLocksService } from "./seat-locks.service";
+import { NotificationsService } from "../notifications/notifications.service";
 
 interface BookingLookupContact {
   phone?: string;
@@ -33,6 +38,7 @@ export class BookingsService implements OnModuleInit {
   constructor(
     private readonly configService: ConfigService,
     private readonly seatLocksService: SeatLocksService,
+    private readonly notificationsService: NotificationsService,
   ) {
     const minutes =
       Number(this.configService.get("BOOKING_EXPIRY_MINUTES")) || 30;
@@ -96,6 +102,11 @@ export class BookingsService implements OnModuleInit {
       contact: dto.contact,
       passengers: dto.passengers,
       status: "pending",
+      paymentStatus: "unpaid",
+      paymentProvider: undefined,
+      paymentIntentId: undefined,
+      paidAt: null,
+      paymentMetadata: null,
       expiresAt,
       createdAt: now.toISOString(),
       updatedAt: now.toISOString(),
@@ -122,6 +133,14 @@ export class BookingsService implements OnModuleInit {
     await this.persist();
     await this.seatLocksService.markSeatsConfirmed(reference);
     this.logger.log(`Booking confirmed: ${reference}`);
+    try {
+      await this.notificationsService.sendBookingConfirmation(booking);
+    } catch (error) {
+      this.logger.error(
+        `Failed to dispatch confirmation notifications for ${reference}`,
+        error as Error,
+      );
+    }
     return booking;
   }
 
@@ -141,6 +160,9 @@ export class BookingsService implements OnModuleInit {
     await this.expireStaleBookings();
     const booking = this.getBooking(reference);
     booking.status = "cancelled";
+    if (booking.paymentStatus === "processing") {
+      booking.paymentStatus = "failed";
+    }
     booking.expiresAt = null;
     booking.updatedAt = new Date().toISOString();
     await this.persist();
@@ -172,6 +194,90 @@ export class BookingsService implements OnModuleInit {
     return this.confirm(reference);
   }
 
+  async updateBooking(
+    reference: string,
+    dto: UpdateBookingDto,
+  ): Promise<BookingRecord> {
+    await this.expireStaleBookings();
+    const booking = this.getBooking(reference);
+    if (booking.status === "cancelled" || booking.status === "expired") {
+      throw new BadRequestException({
+        code: "BOOKING_003",
+        message: "Booking can no longer be modified",
+      });
+    }
+    if (!dto.contact && !dto.passengers) {
+      throw new BadRequestException({
+        code: "BOOKING_008",
+        message: "No changes supplied",
+      });
+    }
+
+    if (dto.contact) {
+      booking.contact = {
+        ...booking.contact,
+        ...dto.contact,
+      };
+    }
+
+    if (dto.passengers) {
+      const newSeatLabels = dto.passengers.map((pax) =>
+        pax.seatLabel.trim().toUpperCase(),
+      );
+      const currentSeats = booking.passengers.map((pax) =>
+        pax.seatLabel.trim().toUpperCase(),
+      );
+      const currentSeatSet = new Set(currentSeats);
+      const newSeatSet = new Set(newSeatLabels);
+      const seatsChanged =
+        newSeatLabels.length !== currentSeats.length ||
+        newSeatLabels.some((label) => !currentSeatSet.has(label)) ||
+        currentSeats.some((label) => !newSeatSet.has(label));
+
+      if (seatsChanged) {
+        await this.seatLocksService.releaseSeats(reference, true);
+        try {
+          await this.seatLocksService.lockSeats({
+            route: booking.route,
+            travelDate: booking.travelDate,
+            seatType: booking.seatType,
+            company: booking.company,
+            busPlate: booking.busPlate,
+            seatLabels: newSeatLabels,
+            bookingReference: reference,
+            expiresAt: booking.expiresAt ?? null,
+          });
+          if (booking.status === "confirmed") {
+            await this.seatLocksService.markSeatsConfirmed(reference);
+          }
+        } catch (error) {
+          await this.seatLocksService.lockSeats({
+            route: booking.route,
+            travelDate: booking.travelDate,
+            seatType: booking.seatType,
+            company: booking.company,
+            busPlate: booking.busPlate,
+            seatLabels: currentSeats,
+            bookingReference: reference,
+            expiresAt: booking.expiresAt ?? null,
+          });
+          if (booking.status === "confirmed") {
+            await this.seatLocksService.markSeatsConfirmed(reference);
+          }
+          throw error;
+        }
+      }
+
+      booking.passengers = dto.passengers;
+      booking.seatCount = dto.passengers.length;
+      booking.total = booking.pricePerTicket * booking.seatCount;
+    }
+
+    booking.updatedAt = new Date().toISOString();
+    await this.persist();
+    return booking;
+  }
+
   private getBooking(reference: string): BookingRecord {
     const booking = this.bookings.find((b) => b.bookingReference === reference);
     if (!booking) {
@@ -194,6 +300,9 @@ export class BookingsService implements OnModuleInit {
         Date.parse(booking.expiresAt) <= now
       ) {
         booking.status = "expired";
+        if (booking.paymentStatus !== "paid") {
+          booking.paymentStatus = "failed";
+        }
         booking.updatedAt = new Date().toISOString();
         await this.seatLocksService.releaseSeats(booking.bookingReference);
         mutated = true;
@@ -216,7 +325,11 @@ export class BookingsService implements OnModuleInit {
   private async loadFromDisk() {
     try {
       const contents = await fs.readFile(this.storagePath, "utf8");
-      this.bookings = contents ? (JSON.parse(contents) as BookingRecord[]) : [];
+      this.bookings = contents
+        ? (JSON.parse(contents) as BookingRecord[]).map((booking) =>
+            this.normalizeBooking(booking),
+          )
+        : [];
     } catch (error) {
       this.logger.error("Failed to read bookings storage", error as Error);
       this.bookings = [];
@@ -288,5 +401,100 @@ export class BookingsService implements OnModuleInit {
     }
     const digits = value.replace(/\D/g, "");
     return digits.length > 0 ? digits : null;
+  }
+
+  async getAllBookings(): Promise<BookingRecord[]> {
+    await this.expireStaleBookings();
+    return [...this.bookings];
+  }
+
+  async runExpirationSweep() {
+    await this.expireStaleBookings();
+  }
+
+  async markPaymentProcessing(
+    reference: string,
+    paymentIntentId: string,
+    provider: string,
+    metadata?: Record<string, unknown>,
+  ) {
+    await this.expireStaleBookings();
+    const booking = this.getBooking(reference);
+    booking.paymentStatus = "processing";
+    booking.paymentProvider = provider;
+    booking.paymentIntentId = paymentIntentId;
+    booking.paymentMetadata = metadata ?? booking.paymentMetadata ?? null;
+    booking.updatedAt = new Date().toISOString();
+    await this.persist();
+    this.logger.log(
+      `Booking ${reference} marked as processing for payment ${paymentIntentId}`,
+    );
+  }
+
+  async handlePaymentSuccess(
+    reference: string,
+    paymentIntentId: string,
+    provider: string,
+    metadata?: Record<string, unknown>,
+  ) {
+    await this.expireStaleBookings();
+    const booking = this.getBooking(reference);
+    booking.paymentStatus = "paid";
+    booking.paymentProvider = provider;
+    booking.paymentIntentId = paymentIntentId;
+    booking.paymentMetadata = metadata ?? booking.paymentMetadata ?? null;
+    booking.paidAt = new Date().toISOString();
+    booking.updatedAt = new Date().toISOString();
+    this.logger.log(
+      `Booking ${reference} marked as paid via ${provider} (${paymentIntentId})`,
+    );
+    if (booking.status !== "confirmed") {
+      await this.confirm(reference);
+      return;
+    }
+    await this.persist();
+  }
+
+  async handlePaymentFailure(
+    reference: string,
+    paymentIntentId: string,
+    provider?: string,
+    metadata?: Record<string, unknown>,
+  ) {
+    await this.expireStaleBookings();
+    const booking = this.getBooking(reference);
+    booking.paymentStatus = "failed";
+    booking.paymentProvider = provider ?? booking.paymentProvider;
+    booking.paymentIntentId = paymentIntentId;
+    booking.paymentMetadata = metadata ?? booking.paymentMetadata ?? null;
+    booking.updatedAt = new Date().toISOString();
+    await this.persist();
+    this.logger.warn(
+      `Booking ${reference} payment ${paymentIntentId} marked as failed`,
+    );
+  }
+
+  private normalizeBooking(candidate: BookingRecord): BookingRecord {
+    const paymentStatus = this.ensurePaymentStatus(candidate.paymentStatus);
+    return {
+      ...candidate,
+      paymentStatus,
+      paymentProvider: candidate.paymentProvider,
+      paymentIntentId: candidate.paymentIntentId,
+      paidAt: candidate.paidAt ?? null,
+      paymentMetadata:
+        typeof candidate.paymentMetadata === "object"
+          ? candidate.paymentMetadata
+          : null,
+    };
+  }
+
+  private ensurePaymentStatus(
+    status?: BookingPaymentStatus,
+  ): BookingPaymentStatus {
+    if (!status) {
+      return "unpaid";
+    }
+    return status;
   }
 }

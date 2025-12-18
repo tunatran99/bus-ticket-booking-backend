@@ -1,4 +1,5 @@
 export type BookingStatus = "pending" | "confirmed" | "cancelled" | "expired";
+export type BookingPaymentStatus = "unpaid" | "processing" | "paid" | "failed";
 
 export interface BookingPassenger {
   name: string;
@@ -30,6 +31,11 @@ export interface BookingRecord {
   contact: BookingContact;
   passengers: BookingPassenger[];
   status: BookingStatus;
+  paymentStatus: BookingPaymentStatus;
+  paymentProvider?: string;
+  paymentIntentId?: string;
+  paidAt?: string | null;
+  paymentMetadata?: Record<string, unknown> | null;
   expiresAt?: string | null;
   createdAt: string;
   updatedAt: string;
